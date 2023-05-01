@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.04.28
+# Last update: 23.05.01
 '''
 import os
 import logging
@@ -64,6 +64,11 @@ torch.backends.cudnn.benchmark=False
 
 ### Network & Data loader setting ###
 model = QSMnet(channel_in=args.CHANNEL_IN, kernel_size=args.KERNEL_SIZE).to(device)
+
+if torch.cuda.device_count() > 1:
+    logger.info(f'Multi GPU - num: {torch.cuda.device_count()} - are used')
+    model = nn.DataParallel(model).to(device)
+
 optimizer = torch.optim.RMSprop(model.parameters(), lr=args.LEARNING_RATE)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.98, last_epoch=-1)
 # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=args.LR_EXP_DECAY_GAMMA)
@@ -84,6 +89,7 @@ nrmse = []
 psnr = []
 best_loss = math.inf; best_nrmse = math.inf; best_psnr = -math.inf
 best_epoch_loss = 0; best_epoch_nrmse = 0; best_epoch_psnr = 0
+data_index = 0; local_f_index = 1; qsm_index = 2; mask_index = 2;
 
 start_time = time.time()
 
@@ -108,10 +114,10 @@ for epoch in tqdm(range(args.TRAIN_EPOCH)):
         m_batch = train_data[3].to(device)
         
         ### Masking ###
-        # dim: [8, 1, 64, 64, 64]
+        # input dim: [batch_size, 1, 64, 64, 64]
+        # label dim: [batch_size, 1, 64, 64, 64]
         local_f_batch = local_f_batch * m_batch
-
-        # dim: [8, 2, 64, 64, 64]
+        
         pred = model(local_f_batch)
         
         ##
@@ -205,9 +211,10 @@ for epoch in tqdm(range(args.TRAIN_EPOCH)):
     ### Saving the model ###
 #     if (epoch+1) % args.SAVE_STEP == 0:
 #         save_model(epoch+1, model, args.CHECKPOINT_PATH, epoch+1)
-# logger.info("------ Training is finished ------")
-# logger.info(f'[best epochs]\nLoss: {best_epoch_loss}\nNRMSE: {best_epoch_nrmse}\nPSNR: {best_epoch_psnr}')
-# logger.info(f'Total training time: {time.time() - start_time}')
+
+logger.info("------ Training is finished ------")
+logger.info(f'[best epochs]\nLoss: {best_epoch_loss}\nNRMSE: {best_epoch_nrmse}\nPSNR: {best_epoch_psnr}')
+logger.info(f'Total training time: {time.time() - start_time}')
 
 ### Plotting learning curve & result curves ###
 epoch_list = range(1, args.TRAIN_EPOCH + 1)

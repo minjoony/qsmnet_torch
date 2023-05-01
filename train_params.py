@@ -8,9 +8,8 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.04.28
+# Last update: 23.05.01
 '''
-
 """
 Experiment setting parameters
     GPU_NUM: number of GPU to use.
@@ -28,17 +27,17 @@ Experiment setting parameters
     PRE_NET_CHECKPOINT_PATH: path of pre-network(QSMnet) checkpoint.
     PRE_NET_CHECKPOINT_FILE: filename of pre-network(QSMnet) checkpoint.
 """
-GPU_NUM = '0'
+GPU_NUM = '0, 1'
 SEED = 777
 INPUT_UNIT = 'ppm'
 
 TRAIN_PATH = '../Data/Train/'
 VALID_PATH = '../Data/Valid/'
 VALUE_PATH = '../Data/'
-TRAIN_FILE = 'xsepnet_train_patch.hdf5'
+TRAIN_FILE = 'xsepnet_train_patch_augmented.hdf5'
 VALID_FILE = 'subj10_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat'
-VALUE_FILE = 'xsepnet_train_patch_norm_factor.mat'
-CHECKPOINT_PATH = './Checkpoint/230428_qsmnet_cosmos_stepLR/'
+VALUE_FILE = 'xsepnet_train_patch_norm_factor_augmented.mat'
+CHECKPOINT_PATH = './Checkpoint/230428_qsmnetplus_cosmos_stepLR/'
 
 
 """
@@ -74,13 +73,13 @@ Hyper-parameters
     W_MDLOSS: weight of model loss [QSMnet: 1, QSMnet+: 0.5]
     W_GDLOSS: weight of gradient loss [QSMnet: 0.1, QSMnet+: 0.1]
 """
-TRAIN_EPOCH = 50
+TRAIN_EPOCH = 25
 SAVE_STEP = 10
 LEARNING_RATE = 0.001
 LR_EXP_DECAY_GAMMA = 'stepLR'
 BATCH_SIZE = 12
 W_L1Loss = 1
-W_MDLOSS = 1
+W_MDLOSS = 0.5
 W_GDLOSS = 0.1
 
 import argparse

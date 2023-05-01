@@ -1,3 +1,15 @@
+'''
+#
+# Description:
+#  Util codes for qsmnet
+#
+#  Copyright @ 
+#  Laboratory for Imaging Science and Technology
+#  Seoul National University
+#  email : minjoony@snu.ac.kr
+#
+# Last update: 23.05.01
+'''
 import os
 import math
 import numpy as np
@@ -244,7 +256,21 @@ def createDirectory(directory):
         print("Error: Failed to create the directory.")
         
         
+def crop_img_16x(img):
+    """
+    input: 3D img [H, W, C]
+    output: cropped 3D img with a H, W of 16x
+    """
+    if img.shape[0] % 16 != 0:
+        residual = img.shape[0] % 16
+        img = img[int(residual/2):int(-(residual/2)), :, :]
         
+    if img.shape[1] % 16 != 0:
+        residual = img.shape[1] % 16
+        img = img[:, int(residual/2):int(-(residual/2)), :]
+        
+    return img
+
 
 # class train_dataset():
 #     def __init__(self, args):
