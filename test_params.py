@@ -40,9 +40,10 @@ LABEL_EXIST = True
 CSF_MASK_EXIST = True
 
 TEST_PATH = '../Data/Test/'
-TEST_FILE = ['subj05_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj06_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat',  'subj08_DataFor_xsepnet_ppm_COSMOS_6dir_final', 'subj14_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat']
+TEST_FILE = ['subj05_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj06_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj08_DataFor_xsepnet_ppm_COSMOS_6dir_final', 'subj14_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat']
 
-CHECKPOINT_PATH = './Checkpoint/230428_qsmnet_cosmos_paperVer/'
+CHECKPOINT_PATH = './Checkpoint/230428_qsmnet_cosmos_stepLR/'
+# CHECKPOINT_PATH = './Checkpoint/230428_qsmnetplus_cosmos_paperVer/'
 CHECKPOINT_FILE = 'best_nrmse.pth.tar'
 
 VALUE_FILE_PATH = '../Data/'
