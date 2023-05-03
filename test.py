@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 import logging_helper as logging_helper
 
 from tqdm import tqdm
+from collections import OrderedDict
 from torch.utils.data import Dataset, DataLoader
 
 from utils import *
@@ -56,7 +57,44 @@ test_set = test_dataset(args)
 model = QSMnet(channel_in=args.CHANNEL_IN, kernel_size=args.KERNEL_SIZE).to(device)
 load_file_name = args.CHECKPOINT_PATH + 'best_' + args.TAG + '.pth.tar'
 checkpoint = torch.load(load_file_name)
-model.load_state_dict(checkpoint['state_dict'])
+
+multi_gpu_used = 0
+new_state_dict = OrderedDict()
+for name in checkpoint['state_dict']:    
+    if name[:6] != 'module':
+        break
+    else:
+        multi_gpu_used = 1
+        new_name = name[7:]
+        new_state_dict[new_name] = checkpoint['state_dict'][name]
+
+if multi_gpu_used == 0:
+    model.load_state_dict(checkpoint['state_dict'])
+elif multi_gpu_used == 1:    
+    logger.info(f'Multi GPU - num: {torch.cuda.device_count()} - are used')
+    model.load_state_dict(new_state_dict)
+    
+# for name, vec in state_dict.items():
+#     if name[0:7] != 'module':
+#         break
+#     else:
+        
+# # original saved file with DataParallel
+# state_dict = torch.load(load_file_name)
+# # create new OrderedDict that does not contain `module.`
+# from collections import OrderedDict
+# new_state_dict = OrderedDict()
+# for k, v in state_dict.items():
+#     name = k[7:] # remove `module.`
+#     new_state_dict[name] = v
+# # load params
+# model.load_state_dict(new_state_dict)
+
+# if torch.cuda.device_count() > 1:
+#     logger.info(f'Multi GPU - num: {torch.cuda.device_count()} - are used')
+#     model = nn.DataParallel(model).to(device)
+
+# model.load_state_dict(checkpoint['state_dict'])
 best_epoch = checkpoint['epoch']
 
 loss_total_list = []
