@@ -74,27 +74,6 @@ elif multi_gpu_used == 1:
     logger.info(f'Multi GPU - num: {torch.cuda.device_count()} - are used')
     model.load_state_dict(new_state_dict)
     
-# for name, vec in state_dict.items():
-#     if name[0:7] != 'module':
-#         break
-#     else:
-        
-# # original saved file with DataParallel
-# state_dict = torch.load(load_file_name)
-# # create new OrderedDict that does not contain `module.`
-# from collections import OrderedDict
-# new_state_dict = OrderedDict()
-# for k, v in state_dict.items():
-#     name = k[7:] # remove `module.`
-#     new_state_dict[name] = v
-# # load params
-# model.load_state_dict(new_state_dict)
-
-# if torch.cuda.device_count() > 1:
-#     logger.info(f'Multi GPU - num: {torch.cuda.device_count()} - are used')
-#     model = nn.DataParallel(model).to(device)
-
-# model.load_state_dict(checkpoint['state_dict'])
 best_epoch = checkpoint['epoch']
 
 loss_total_list = []
