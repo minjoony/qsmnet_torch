@@ -37,7 +37,7 @@ VALUE_PATH = '../Data/'
 TRAIN_FILE = 'xsepnet_train_patch_augmented.hdf5'
 VALID_FILE = 'subj10_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat'
 VALUE_FILE = 'xsepnet_train_patch_norm_factor_augmented.mat'
-CHECKPOINT_PATH = './Checkpoint/230428_qsmnetplus_cosmos_stepLR/'
+CHECKPOINT_PATH = './Checkpoint/230502_qsmnetplus_cosmos_stepLR_0003/'
 
 
 """
@@ -75,7 +75,7 @@ Hyper-parameters
 """
 TRAIN_EPOCH = 25
 SAVE_STEP = 10
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.003
 LR_EXP_DECAY_GAMMA = 'stepLR'
 BATCH_SIZE = 12
 W_L1Loss = 1

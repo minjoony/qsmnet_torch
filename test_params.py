@@ -36,21 +36,21 @@ Experiment setting parameters
 GPU_NUM = '2'
 INPUT_UNIT = 'ppm'
 TAG = 'nrmse'
-LABEL_EXIST = True
-CSF_MASK_EXIST = True
+LABEL_EXIST = False
+CSF_MASK_EXIST = False
 
 TEST_PATH = '../Data/Test/'
-TEST_FILE = ['subj05_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj06_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj08_DataFor_xsepnet_ppm_COSMOS_6dir_final', 'subj14_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat']
+TEST_FILE = ['MSsubj2_calcification_DataFor_xsepnet_ppm.mat']
+# TEST_FILE = ['subj05_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj06_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj08_DataFor_xsepnet_ppm_COSMOS_6dir_final', 'subj14_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat']
 
 CHECKPOINT_PATH = './Checkpoint/230428_qsmnet_cosmos_stepLR/'
-# CHECKPOINT_PATH = './Checkpoint/230428_qsmnetplus_cosmos_paperVer/'
 CHECKPOINT_FILE = 'best_nrmse.pth.tar'
 
 VALUE_FILE_PATH = '../Data/'
 VALUE_FILE_NAME = 'xsepnet_train_patch_norm_factor.mat'
 
 RESULT_PATH = CHECKPOINT_PATH + 'Results/'
-RESULT_FILE = 'Result_'
+RESULT_FILE = 'qsmnetplus_'
 
 
 """

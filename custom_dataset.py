@@ -149,7 +149,9 @@ class test_dataset():
                 self.qsm.append(crop_img_16x(data_file['cosmos_4d']))
 
             if args.CSF_MASK_EXIST is True:
-                self.csf_mask.append(crop_img_16x(data_file['csf_mask_4d']))
+                csf_mask_only = crop_img_16x(data_file['csf_mask_4d'])
+                mask_wo_csf = self.mask - csf_mask_only
+                self.csf_mask.append(mask_wo_csf)
 
             self.matrix_size.append(crop_img_16x(data_file['mask_4d']).shape)
             
