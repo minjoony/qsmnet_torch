@@ -1,15 +1,16 @@
 '''
 #
 # Description:
-#  Test code of qsmnet
+#  Test code of x-sepnet
 #
 #  Copyright @ 
 #  Laboratory for Imaging Science and Technology
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.05.04
+# Last update: 23.04.27
 '''
+
 import os
 import logging
 import glob
@@ -19,13 +20,7 @@ import shutil
 import random
 import numpy as np
 import torch
-import datetime
 import matplotlib.pyplot as plt
-import logging_helper as logging_helper
-
-from tqdm import tqdm
-from collections import OrderedDict
-from torch.utils.data import Dataset, DataLoader
 
 from utils import *
 from network import *
@@ -38,23 +33,17 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]= str(args.GPU_NUM)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-### Logger setting ###
-logger = logging.getLogger("module.test")
-logger.setLevel(logging.INFO)
-logging_helper.setup(args.CHECKPOINT_PATH + 'Results', 'test_log.txt')
-
-nowDate = datetime.datetime.now().strftime('%Y-%m-%d')
-nowTime = datetime.datetime.now().strftime('%H:%M:%S')
-logger.info(f'Date: {nowDate}  {nowTime}')
-
-for key, value in vars(args).items():
-    logger.info('{:15s}: {}'.format(key,value))
-    
 test_set = test_dataset(args)
 
 ### Network & Data loader setting ###
-model = QSMnet(channel_in=args.CHANNEL_IN, kernel_size=args.KERNEL_SIZE).to(device)
+pre_model = QSMnet(channel_in=args.CHANNEL_IN, kernel_size=args.KERNEL_SIZE).to(device)
+PRE_NET_WEIGHT_NAME = args.PRE_NET_CHECKPOINT_PATH + args.PRE_NET_CHECKPOINT_FILE
+PRE_NET_WEIGHT = torch.load(PRE_NET_WEIGHT_NAME)
+
+
+pre_model.load_state_dict(PRE_NET_WEIGHT['state_dict'])
+
+model = KAInet(channel_in=args.CHANNEL_IN, kernel_size=args.KERNEL_SIZE).to(device)
 load_file_name = args.CHECKPOINT_PATH + 'best_' + args.TAG + '.pth.tar'
 checkpoint = torch.load(load_file_name)
 
@@ -71,155 +60,177 @@ for name in checkpoint['state_dict']:
 if multi_gpu_used == 0:
     model.load_state_dict(checkpoint['state_dict'])
 elif multi_gpu_used == 1:    
-    logger.info(f'Multi GPU - num: {torch.cuda.device_count()} - are used')
+    logger.info(f'x-sepnet: multi GPU - num: {torch.cuda.device_count()} - were used')
     model.load_state_dict(new_state_dict)
     
+model.load_state_dict(checkpoint['state_dict'])
 best_epoch = checkpoint['epoch']
-
-loss_total_list = []
-NRMSE_total_list = []
-PSNR_total_list = []
-SSIM_total_list = []
-time_total_list = []
 
 if not os.path.exists(args.RESULT_PATH):
     os.makedirs(args.RESULT_PATH)
+
+print(f'Best epoch: {best_epoch}\n')
+
+print("------ Testing is started ------")
+with torch.no_grad():
+    pre_model.eval()
+    model.eval()
     
-logger.info(f'Best epoch: {best_epoch}\n')
+    pred_x_pos_map = np.zeros(test_set.matrix_size)
+    pred_x_neg_map = np.zeros(test_set.matrix_size)
+    pred_sus_map = np.zeros(test_set.matrix_size)
 
-logger.info("------ Testing is started ------")
+    valid_loss_list = []
+    pos_nrmse_list = []
+    pos_psnr_list = []
+    pos_ssim_list = []
 
-for idx in range(0, len(args.TEST_FILE)):
-    subj_name = args.TEST_FILE[idx].split('_')[0]
+    neg_nrmse_list = []
+    neg_psnr_list = []
+    neg_ssim_list = []
     
-    with torch.no_grad():
-        model.eval()
+    time_list = []
+
+    for direction in range(test_set.matrix_size[-1]):
+        ### Setting dataset & normalization ###
+        local_f_batch = torch.tensor(test_set.field[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
+        m_batch = torch.tensor(test_set.mask[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float).squeeze()
         
-        valid_loss_list = []
-        nrmse_list = []
-        psnr_list = []
-        ssim_list = []
+        if args.LABEL_EXIST is True:
+            x_pos_batch = torch.tensor(test_set.x_pos[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
+            x_neg_batch = torch.tensor(test_set.x_neg[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
+            x_pos_batch = ((x_pos_batch.cpu() - test_set.x_pos_mean) / test_set.x_pos_std).to(device)
+            x_neg_batch = ((x_neg_batch.cpu() - test_set.x_neg_mean) / test_set.x_neg_std).to(device)
+            label_batch = torch.cat((x_pos_batch, x_neg_batch), 1)
+            
+            if args.CSF_MASK_EXIST is True:
+                csf_mask_batch = torch.tensor(test_set.csf_mask[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float).squeeze()
 
-        time_list = []
+        if args.INPUT_MAP == 'r2p':
+            r2input_batch = torch.tensor(test_set.r2prime[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
+            r2input_batch = ((r2input_batch.cpu() - test_set.r2prime_mean) / test_set.r2prime_std).to(device)
+            
+        elif args.INPUT_MAP == 'r2s':
+            r2input_batch = torch.tensor(test_set.r2star[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
+            r2input_batch = ((r2input_batch.cpu() - test_set.r2star_mean) / test_set.r2star_std).to(device)
+            
+        local_f_batch = ((local_f_batch.cpu() - test_set.field_mean) / test_set.field_std).to(device)
 
-        input_field = test_set.field[idx]
-        input_mask = test_set.mask[idx]
-        matrix_size = test_set.matrix_size[idx]
+
+        ### Brain masking ###
+        local_f_batch = local_f_batch * m_batch
+        r2input_batch = r2input_batch * m_batch
         
-        if len(matrix_size) == 3:
-            ### Case of single head-orientation: expanding dim ###
-            matrix_size_list = list(matrix_size)
-            matrix_size_list.append(1)
-            matrix_size = tuple(matrix_size_list)
-            
-            input_field = np.expand_dims(input_field, 3)
-            input_mask = np.expand_dims(input_mask, 3)
 
-        input_field_map = np.zeros(matrix_size)
-        pred_qsm_map = np.zeros(matrix_size)
-        label_qsm_map = np.zeros(matrix_size)
+        ### Extract cosmos batch from pre-QSM Network ###
+        pred_cosmos = pre_model(local_f_batch)
+        pred_cosmos_batch = pred_cosmos * m_batch
         
-        for direction in range(0, matrix_size[-1]):
-            ### Setting dataset ###
-            local_f_batch = torch.tensor(input_field[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
-            local_f_batch = ((local_f_batch.cpu() - test_set.field_mean) / test_set.field_std).to(device) # normalization
+        input_batch = torch.cat((pred_cosmos_batch, local_f_batch, r2input_batch), 1)
 
-            m_batch = torch.tensor(input_mask[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float).squeeze()
+        start_time = time.time()
+        pred = model(input_batch)
+        time_list.append(time.time() - start_time)
+        
+        
+        ### De-normalization ###
+        pred_cosmos = ((pred_cosmos.cpu() * test_set.cosmos_std) + test_set.cosmos_mean).to(device).squeeze()
+        pred_x_pos = ((pred[:, 0, ...].cpu() * test_set.x_pos_std) + test_set.x_pos_mean).to(device).squeeze()
+        pred_x_neg = ((pred[:, 1, ...].cpu() * test_set.x_neg_std) + test_set.x_neg_mean).to(device).squeeze()
+
+        
+        if args.LABEL_EXIST is True:
+            ### De-normalization ###
+            label_x_pos = ((x_pos_batch.cpu() * test_set.x_pos_std) + test_set.x_pos_mean).to(device).squeeze()
+            label_x_neg = ((x_neg_batch.cpu() * test_set.x_neg_std) + test_set.x_neg_mean).to(device).squeeze()
             
-            local_f_batch = local_f_batch * m_batch # masking
-            
-            if args.LABEL_EXIST == True:
-                qsm_batch = torch.tensor(test_set.qsm[idx][np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
-                qsm_batch = ((qsm_batch.cpu() - test_set.qsm_mean) / test_set.qsm_std).to(device) # normalization
-                qsm_batch = qsm_batch * m_batch # masking
-
-            ### input dim: [batch_size, 1, 64, 64, 64]
-            ### label dim: [batch_size, 1, 64, 64, 64]
-            start_time = time.time()
-            pred_batch = model(local_f_batch)
-            inferenc_time = time.time() - start_time
-            time_list.append(inferenc_time)
-            time_total_list.append(inferenc_time)
-
-            if args.LABEL_EXIST == True:
-                l1loss = l1_loss(pred_batch, qsm_batch)
-                label_qsm = ((qsm_batch.cpu() * test_set.qsm_std) + test_set.qsm_mean).to(device).squeeze() # denormalization
-
-            input_field = ((local_f_batch[:, 0, ...].cpu() * test_set.field_std) + test_set.field_mean).to(device).squeeze()
-            pred_qsm = ((pred_batch[:, 0, ...].cpu() * test_set.qsm_std) + test_set.qsm_mean).to(device).squeeze() # denormalization
-                
             ### Metric calculation ###
-            if args.LABEL_EXIST == True:
-                if args.CSF_MASK_EXIST == True:
-                    csf_mask_batch = torch.tensor(test_set.csf_mask[idx][np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float).squeeze()
-
-                    nrmse = NRMSE(pred_qsm, label_qsm, csf_mask_batch)
-                    psnr = PSNR(pred_qsm, label_qsm, csf_mask_batch)
-                    ssim = SSIM(pred_qsm.cpu(), label_qsm.cpu(), csf_mask_batch.cpu())
-                elif args.CSF_MASK_EXIST == False:
-                    nrmse = NRMSE(pred_qsm, label_qsm, m_batch)
-                    psnr = PSNR(pred_qsm, label_qsm, m_batch)
-                    ssim = SSIM(pred_qsm.cpu(), label_qsm.cpu(), m_batch.cpu())
-
-                valid_loss_list.append(l1loss.item())
-                nrmse_list.append(nrmse)
-                psnr_list.append(psnr)
-                ssim_list.append(ssim)
-
-                loss_total_list.append(l1loss.item())
-                NRMSE_total_list.append(nrmse)
-                PSNR_total_list.append(psnr)
-                SSIM_total_list.append(ssim)
-                
-                label_qsm_map[...,  direction] = label_qsm.cpu() * m_batch.cpu()
-
-            input_field_map[..., direction] = input_field.cpu() * m_batch.cpu()
-            pred_qsm_map[..., direction] = pred_qsm.cpu() * m_batch.cpu()
+            l1loss = l1_loss(pred, label_batch)
             
-            torch.cuda.empty_cache();
+            if args.CSF_MASK_EXIST is True:
+                pos_nrmse = NRMSE(pred_x_pos, label_x_pos, csf_mask_batch)
+                pos_psnr = PSNR(pred_x_pos, label_x_pos, csf_mask_batch)
+                pos_ssim = SSIM(pred_x_pos.cpu(), label_x_pos.cpu(), csf_mask_batch.cpu())
 
-        if args.LABEL_EXIST == True:
-            test_loss = np.mean(valid_loss_list)
-            NRMSE_mean = np.mean(nrmse_list)
-            PSNR_mean = np.mean(psnr_list)
-            SSIM_mean = np.mean(ssim_list)
+                neg_nrmse = NRMSE(pred_x_neg, label_x_neg, csf_mask_batch)
+                neg_psnr = PSNR(pred_x_neg, label_x_neg, csf_mask_batch)
+                neg_ssim = SSIM(pred_x_neg.cpu(), label_x_neg.cpu(), csf_mask_batch.cpu())
+            elif args.CSF_MASK_EXIST is False:
+                pos_nrmse = NRMSE(pred_x_pos, label_x_pos, m_batch)
+                pos_psnr = PSNR(pred_x_pos, label_x_pos, m_batch)
+                pos_ssim = SSIM(pred_x_pos.cpu(), label_x_pos.cpu(), m_batch.cpu())
 
-            NRMSE_std = np.std(nrmse_list)
-            PSNR_std = np.std(psnr_list)
-            SSIM_std = np.std(ssim_list)
-            total_time = np.mean(time_list)
-            logger.info(f'{subj_name} - NRMSE: {NRMSE_mean:.4f}, {NRMSE_std:.4f}  PSNR: {PSNR_mean:.4f}, {PSNR_std:.4f}  SSIM: {SSIM_mean:.4f}, {SSIM_std:.4f}  Loss: {test_loss:.4f}')
+                neg_nrmse = NRMSE(pred_x_neg, label_x_neg, m_batch)
+                neg_psnr = PSNR(pred_x_neg, label_x_neg, m_batch)
+                neg_ssim = SSIM(pred_x_neg.cpu(), label_x_neg.cpu(), m_batch.cpu())
 
-            scipy.io.savemat(args.RESULT_PATH + subj_name + '_' + args.TAG + '.mat',
-                             mdict={'input_local': input_field_map,
-                                    'label_qsm': label_qsm_map,
-                                    'pred_qsm': pred_qsm_map,
-                                    'NRMSEmean': NRMSE_mean,
-                                    'PSNRmean': PSNR_mean,
-                                    'SSIMmean': SSIM_mean,
-                                    'NRMSEstd': NRMSE_std,
-                                    'PSNRstd': PSNR_std,
-                                    'SSIMstd': SSIM_std,
-                                    'inference_time': total_time})
-        else:
-            total_time = np.mean(time_list)
-            scipy.io.savemat(args.RESULT_PATH + args.RESULT_FILE + subj_name + '_' + args.TAG + '.mat',
-                             mdict={'input_local': input_field_map,
-                                    'pred_qsm': pred_qsm_map,
-                                    'inference_time': total_time})
+            valid_loss_list.append(l1loss.item())
+            pos_nrmse_list.append(pos_nrmse)
+            pos_psnr_list.append(pos_psnr)
+            pos_ssim_list.append(pos_ssim)
+            neg_nrmse_list.append(neg_nrmse)
+            neg_psnr_list.append(neg_psnr)
+            neg_ssim_list.append(neg_ssim)
 
-if args.LABEL_EXIST == True:
-    total_loss_mean = np.mean(loss_total_list)
-    total_NRMSE_mean = np.mean(NRMSE_total_list)
-    total_PSNR_mean = np.mean(PSNR_total_list)
-    total_SSIM_mean = np.mean(SSIM_total_list)
+            pred_sus_map[..., direction] = pred_cosmos_batch.cpu()
+            pred_x_pos_map[..., direction] = (pred_x_pos.cpu() * m_batch.cpu())
+            pred_x_neg_map[..., direction] = (pred_x_neg.cpu() * m_batch.cpu())
 
-    total_loss_std = np.std(loss_total_list)
-    total_NRMSE_std = np.std(NRMSE_total_list)
-    total_PSNR_std = np.std(PSNR_total_list)
-    total_SSIM_std = np.std(SSIM_total_list)
+            del(local_f_batch, r2input_batch, x_pos_batch, x_neg_batch, m_batch, input_batch, label_batch, l1loss); torch.cuda.empty_cache();
+            
+        elif args.LABEL_EXIST is False:
+            pred_sus_map[..., direction] = pred_cosmos_batch.cpu()
+            pred_x_pos_map[..., direction] = (pred_x_pos.cpu() * m_batch.cpu())
+            pred_x_neg_map[..., direction] = (pred_x_neg.cpu() * m_batch.cpu())
+            
+            del(local_f_batch, r2input_batch, m_batch, input_batch); torch.cuda.empty_cache();
+    
+    total_time = np.mean(time_list)
 
-    logger.info(f'\n Total NRMSE: {total_NRMSE_mean:.4f}, {total_NRMSE_std:.4f}  PSNR: {total_PSNR_mean:.4f}, {total_PSNR_std:.4f}  SSIM: {total_SSIM_mean:.4f}, {total_SSIM_std:.4f}  Loss: {total_loss_mean:.4f}, {total_loss_std:.4f}')
-logger.info(f'Total inference time: {np.mean(time_total_list)}')
+    if args.LABEL_EXIST is True:
+        test_loss = np.mean(valid_loss_list)
+        pos_NRMSE_mean = np.mean(pos_nrmse_list)
+        pos_PSNR_mean = np.mean(pos_psnr_list)
+        pos_SSIM_mean = np.mean(pos_ssim_list)
+        neg_NRMSE_mean = np.mean(neg_nrmse_list)
+        neg_PSNR_mean = np.mean(neg_psnr_list)
+        neg_SSIM_mean = np.mean(neg_ssim_list)
 
-logger.info("------ Testing is finished ------")
+        pos_NRMSE_std = np.std(pos_nrmse_list)
+        pos_PSNR_std = np.std(pos_psnr_list)
+        pos_SSIM_std = np.std(pos_ssim_list)
+        neg_NRMSE_std = np.std(neg_nrmse_list)
+        neg_PSNR_std = np.std(neg_psnr_list)
+        neg_SSIM_std = np.std(neg_ssim_list)
+
+        scipy.io.savemat(args.RESULT_PATH + args.RESULT_FILE + '_best_' + args.TAG + '.mat',
+                         mdict={'label_x_pos': test_set.x_pos,
+                                'label_x_neg': test_set.x_neg,
+                                'label_local': test_set.field,
+                                'pred_x_pos': pred_x_pos_map,
+                                'pred_x_neg': pred_x_neg_map,
+                                'pred_sus': pred_sus_map,
+                                'posNRMSEmean': pos_NRMSE_mean,
+                                'posPSNRmean': pos_PSNR_mean,
+                                'posSSIMmean': pos_SSIM_mean,
+                                'negNRMSEmean': neg_NRMSE_mean,
+                                'negPSNRmean': neg_PSNR_mean,
+                                'negSSIMmean': neg_SSIM_mean,
+                                'posNRMSEstd': pos_NRMSE_std,
+                                'posPSNRstd': pos_PSNR_std,
+                                'posSSIMstd': pos_SSIM_std,
+                                'negNRMSEstd': neg_NRMSE_std,
+                                'negPSNRstd': neg_PSNR_std,
+                                'negSSIMstd': neg_SSIM_std})
+
+        print(f'Xpos - NRMSE: {pos_NRMSE_mean}, {pos_NRMSE_std}  PSNR: {pos_PSNR_mean}, {pos_PSNR_std}  SSIM: {pos_SSIM_mean}, {pos_SSIM_std}')
+        print(f'Xneg - NRMSE: {neg_NRMSE_mean}, {neg_NRMSE_std}  PSNR: {neg_PSNR_mean}, {neg_PSNR_std}  SSIM: {neg_SSIM_mean}, {neg_SSIM_std}')
+    
+    elif args.LABEL_EXIST is False:
+        scipy.io.savemat(args.RESULT_PATH + args.RESULT_FILE + '_best_' + args.TAG + '.mat',
+                         mdict={'pred_sus': pred_sus_map,
+                                'pred_x_pos': pred_x_pos_map,
+                                'pred_x_neg': pred_x_neg_map})
+        
+print(f'Total inference time: {total_time}')
+print("------ Testing is finished ------")
