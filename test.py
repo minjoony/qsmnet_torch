@@ -49,9 +49,10 @@ logger.info(f'Date: {nowDate}  {nowTime}')
 for key, value in vars(args).items():
     logger.info('{:15s}: {}'.format(key,value))
     
+
+### Data & network setting ###
 test_set = test_dataset(args)
 
-### Network & Data loader setting ###
 model = QSMnet(channel_in=args.CHANNEL_IN, kernel_size=args.KERNEL_SIZE).to(device)
 load_file_name = args.CHECKPOINT_PATH + 'best_' + args.TAG + '.pth.tar'
 checkpoint = torch.load(load_file_name)
@@ -102,6 +103,10 @@ for idx in range(0, len(args.TEST_FILE)):
 
         input_field = test_set.field[idx]
         input_mask = test_set.mask[idx]
+        if args.LABEL_EXIST == True:
+            label_qsm = test_set.qsm[idx]
+        if args.CSF_MASK_EXIST == True:
+            input_csf_mask = test_set.csf_mask[idx]
         matrix_size = test_set.matrix_size[idx]
         
         if len(matrix_size) == 3:
@@ -112,13 +117,17 @@ for idx in range(0, len(args.TEST_FILE)):
             
             input_field = np.expand_dims(input_field, 3)
             input_mask = np.expand_dims(input_mask, 3)
+            if args.LABEL_EXIST == True:
+                label_qsm = np.expand_dims(label_qsm, 3)
+            if args.CSF_MASK_EXIST == True:
+                input_csf_mask = np.expand_dims(input_csf_mask, 3)
 
         input_field_map = np.zeros(matrix_size)
         pred_qsm_map = np.zeros(matrix_size)
         label_qsm_map = np.zeros(matrix_size)
         
-        for direction in range(0, matrix_size[-1]):
-            ### Setting dataset ###
+        for direction in range(matrix_size[-1]):
+            ### Setting dataset & normalization & masking ###
             local_f_batch = torch.tensor(input_field[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
             local_f_batch = ((local_f_batch.cpu() - test_set.field_mean) / test_set.field_std).to(device) # normalization
 
@@ -127,37 +136,38 @@ for idx in range(0, len(args.TEST_FILE)):
             local_f_batch = local_f_batch * m_batch # masking
             
             if args.LABEL_EXIST == True:
-                qsm_batch = torch.tensor(test_set.qsm[idx][np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
+                qsm_batch = torch.tensor(label_qsm[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
                 qsm_batch = ((qsm_batch.cpu() - test_set.qsm_mean) / test_set.qsm_std).to(device) # normalization
                 qsm_batch = qsm_batch * m_batch # masking
 
-            ### input dim: [batch_size, 1, 64, 64, 64]
-            ### label dim: [batch_size, 1, 64, 64, 64]
+            ### Inference ###
+            # input: local_f_batch (dim: [batch_size, 1, 64, 64, 64])
+            # label: qsm_batch (dim: [batch_size, 1, 64, 64, 64])
             start_time = time.time()
             pred_batch = model(local_f_batch)
             inferenc_time = time.time() - start_time
             time_list.append(inferenc_time)
             time_total_list.append(inferenc_time)
 
-            if args.LABEL_EXIST == True:
-                l1loss = l1_loss(pred_batch, qsm_batch)
-                label_qsm = ((qsm_batch.cpu() * test_set.qsm_std) + test_set.qsm_mean).to(device).squeeze() # denormalization
 
-            input_field = ((local_f_batch[:, 0, ...].cpu() * test_set.field_std) + test_set.field_mean).to(device).squeeze()
+            ### De-normalization (input & output) ###
             pred_qsm = ((pred_batch[:, 0, ...].cpu() * test_set.qsm_std) + test_set.qsm_mean).to(device).squeeze() # denormalization
                 
-            ### Metric calculation ###
             if args.LABEL_EXIST == True:
+                label_qsm_for_metric = ((qsm_batch.cpu() * test_set.qsm_std) + test_set.qsm_mean).to(device).squeeze() # denormalization
+                
+                ### Metric calculation ###
+                l1loss = l1_loss(pred_batch, qsm_batch)
                 if args.CSF_MASK_EXIST == True:
-                    csf_mask_batch = torch.tensor(test_set.csf_mask[idx][np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float).squeeze()
+                    csf_mask_batch = torch.tensor(input_csf_mask[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float).squeeze()
 
-                    nrmse = NRMSE(pred_qsm, label_qsm, csf_mask_batch)
-                    psnr = PSNR(pred_qsm, label_qsm, csf_mask_batch)
-                    ssim = SSIM(pred_qsm.cpu(), label_qsm.cpu(), csf_mask_batch.cpu())
+                    nrmse = NRMSE(pred_qsm, label_qsm_for_metric, csf_mask_batch)
+                    psnr = PSNR(pred_qsm, label_qsm_for_metric, csf_mask_batch)
+                    ssim = SSIM(pred_qsm.cpu(), label_qsm_for_metric.cpu(), csf_mask_batch.cpu())
                 elif args.CSF_MASK_EXIST == False:
-                    nrmse = NRMSE(pred_qsm, label_qsm, m_batch)
-                    psnr = PSNR(pred_qsm, label_qsm, m_batch)
-                    ssim = SSIM(pred_qsm.cpu(), label_qsm.cpu(), m_batch.cpu())
+                    nrmse = NRMSE(pred_qsm, label_qsm_for_metric, m_batch)
+                    psnr = PSNR(pred_qsm, label_qsm_for_metric, m_batch)
+                    ssim = SSIM(pred_qsm.cpu(), label_qsm_for_metric.cpu(), m_batch.cpu())
 
                 valid_loss_list.append(l1loss.item())
                 nrmse_list.append(nrmse)
@@ -169,9 +179,9 @@ for idx in range(0, len(args.TEST_FILE)):
                 PSNR_total_list.append(psnr)
                 SSIM_total_list.append(ssim)
                 
-                label_qsm_map[...,  direction] = label_qsm.cpu() * m_batch.cpu()
+                label_qsm_map[...,  direction] = label_qsm_for_metric.cpu() * m_batch.cpu()
 
-            input_field_map[..., direction] = input_field.cpu() * m_batch.cpu()
+            input_field_map[..., direction] = input_field[..., direction]
             pred_qsm_map[..., direction] = pred_qsm.cpu() * m_batch.cpu()
             
             torch.cuda.empty_cache();
@@ -188,7 +198,7 @@ for idx in range(0, len(args.TEST_FILE)):
             total_time = np.mean(time_list)
             logger.info(f'{subj_name} - NRMSE: {NRMSE_mean:.4f}, {NRMSE_std:.4f}  PSNR: {PSNR_mean:.4f}, {PSNR_std:.4f}  SSIM: {SSIM_mean:.4f}, {SSIM_std:.4f}  Loss: {test_loss:.4f}')
 
-            scipy.io.savemat(args.RESULT_PATH + subj_name + '_' + args.TAG + '.mat',
+            scipy.io.savemat(args.RESULT_PATH + args.RESULT_FILE + subj_name + '_' + args.TAG + '.mat',
                              mdict={'input_local': input_field_map,
                                     'label_qsm': label_qsm_map,
                                     'pred_qsm': pred_qsm_map,

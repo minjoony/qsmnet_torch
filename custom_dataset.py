@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.05.01
+# Last update: 23.05.06
 '''
 import math
 import h5py
@@ -142,7 +142,6 @@ class test_dataset():
                 field_in_ppm = field
 
             self.field.append(crop_img_16x(field_in_ppm))
-            
             self.mask.append(crop_img_16x(data_file['mask_4d']))
 
             if args.LABEL_EXIST is True:
@@ -154,18 +153,3 @@ class test_dataset():
                 self.csf_mask.append(mask_wo_csf)
 
             self.matrix_size.append(crop_img_16x(data_file['mask_4d']).shape)
-            
-#     def __len__(self):
-#         return len(self.mask)
-
-#     def __getitem__(self, idx):
-#         # dim: [1, 64, 64, 64]
-#         local_f_batch = self.field[idx,...]
-#         qsm_batch = self.qsm[idx,...]
-#         m_batch = self.mask[idx,...]
-
-#         ### Normalization ###
-#         local_f_batch = ((local_f_batch - self.field_mean) / self.field_std)
-#         qsm_batch = ((qsm_batch - self.qsm_mean) / self.qsm_std)
-
-#         return idx, local_f_batch, qsm_batch, m_batch
