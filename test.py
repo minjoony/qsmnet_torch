@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.05.06
+# Last update: 23.07.13
 '''
 import os
 import logging
@@ -129,7 +129,7 @@ for idx in range(0, len(args.TEST_FILE)):
         for direction in range(matrix_size[-1]):
             ### Setting dataset & normalization & masking ###
             local_f_batch = torch.tensor(input_field[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
-            local_f_batch = ((local_f_batch.cpu() - test_set.field_mean) / test_set.field_std).to(device) # normalization
+            local_f_batch = ((local_f_batch - test_set.field_mean) / test_set.field_std).to(device) # normalization
 
             m_batch = torch.tensor(input_mask[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float).squeeze()
             
@@ -137,7 +137,7 @@ for idx in range(0, len(args.TEST_FILE)):
             
             if args.LABEL_EXIST == True:
                 qsm_batch = torch.tensor(label_qsm[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
-                qsm_batch = ((qsm_batch.cpu() - test_set.qsm_mean) / test_set.qsm_std).to(device) # normalization
+                qsm_batch = ((qsm_batch - test_set.qsm_mean) / test_set.qsm_std).to(device) # normalization
                 qsm_batch = qsm_batch * m_batch # masking
 
             ### Inference ###
@@ -151,10 +151,10 @@ for idx in range(0, len(args.TEST_FILE)):
 
 
             ### De-normalization (input & output) ###
-            pred_qsm = ((pred_batch[:, 0, ...].cpu() * test_set.qsm_std) + test_set.qsm_mean).to(device).squeeze() # denormalization
+            pred_qsm = ((pred_batch[:, 0, ...] * test_set.qsm_std) + test_set.qsm_mean).to(device).squeeze() # denormalization
                 
             if args.LABEL_EXIST == True:
-                label_qsm_for_metric = ((qsm_batch.cpu() * test_set.qsm_std) + test_set.qsm_mean).to(device).squeeze() # denormalization
+                label_qsm_for_metric = ((qsm_batch * test_set.qsm_std) + test_set.qsm_mean).to(device).squeeze() # denormalization
                 
                 ### Metric calculation ###
                 l1loss = l1_loss(pred_batch, qsm_batch)
@@ -163,11 +163,11 @@ for idx in range(0, len(args.TEST_FILE)):
 
                     nrmse = NRMSE(pred_qsm, label_qsm_for_metric, csf_mask_batch)
                     psnr = PSNR(pred_qsm, label_qsm_for_metric, csf_mask_batch)
-                    ssim = SSIM(pred_qsm.cpu(), label_qsm_for_metric.cpu(), csf_mask_batch.cpu())
+                    ssim, ssim_map = SSIM(pred_qsm, label_qsm_for_metric, csf_mask_batch)
                 elif args.CSF_MASK_EXIST == False:
                     nrmse = NRMSE(pred_qsm, label_qsm_for_metric, m_batch)
                     psnr = PSNR(pred_qsm, label_qsm_for_metric, m_batch)
-                    ssim = SSIM(pred_qsm.cpu(), label_qsm_for_metric.cpu(), m_batch.cpu())
+                    ssim, ssim_map = SSIM(pred_qsm, label_qsm_for_metric, m_batch)
 
                 valid_loss_list.append(l1loss.item())
                 nrmse_list.append(nrmse)

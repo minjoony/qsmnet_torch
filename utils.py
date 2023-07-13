@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.05.01
+# Last update: 23.07.13
 '''
 import os
 import math
@@ -84,24 +84,37 @@ def model_loss(pred_qsm, label_local_f, m, d):
         [ local field map = sus map * dipole kernel ] in image domain
         using FFT, we can use multiplication instead of convolution.
     """
-    ### Model loss of qsm map ###
     num_batch = pred_qsm.shape[0]
     device = pred_qsm.device;
     
-    ### FFT(pred qsm map) x dipole kernel ###
-    fft_p = torch.fft.fftn(pred_qsm)
-    dtype = fft_p.dtype;
+    ### FFT(pred sus map) x dipole kernel ###
+    pred_qsm = torch.stack((pred_qsm, torch.zeros(pred_qsm.shape, dtype=pred_qsm.dtype, device=device)), dim=-1)
+    fft_p = torch.fft.fft(pred_qsm, 3)
+    # dtype = fft_p.dtype;
     
     d = d[np.newaxis, np.newaxis, ...]
-    d = torch.tensor(d, dtype=dtype, device=device).repeat(num_batch, 1, 1, 1, 1)
+    d = torch.tensor(d, dtype=pred_qsm.dtype, device=device).repeat(num_batch, 1, 1, 1, 1)
+    d = torch.stack((d, torch.zeros(d.shape, dtype=pred_qsm.dtype, device=device)), dim=-1)
     
-    y = fft_p * d
+    y = torch.zeros(pred_qsm.shape, dtype=pred_qsm.dtype, device=device)
+    y[..., 0] = fft_p[..., 0] * d[..., 0] - fft_p[..., 1] * d[..., 1] # real part
+    y[..., 1] = fft_p[..., 0] * d[..., 1] + fft_p[..., 1] * d[..., 0] # imaginary part
     
     ### IFT results = pred susceptibility map * dipole kernel ###
-    y = torch.fft.ifftn(y)
-    pred_local_f = y.real
+    y = torch.fft.ifft(y, 3)
+    pred_local_f = y[..., 0]
+    
+    ############################################################################################################
+#     pred_local_f_temp = pred_local_f.cpu().detach().numpy() * m.cpu().detach().numpy()
+#     label_local_f_temp = label_local_f.cpu().detach().numpy() * m.cpu().detach().numpy()
+        
+#     scipy.io.savemat('./predMaps_train_field.mat',
+#              mdict={'pred_local': pred_local_f_temp,
+#                     'label_local': label_local_f_temp})
+    ############################################################################################################
     
     local_f_loss = l1_loss(label_local_f*m, pred_local_f*m)
+    
     return local_f_loss
 
 
@@ -216,6 +229,12 @@ def NRMSE(im1, im2, mask):
     
     mse = torch.mean((im1-im2)**2)
     nrmse = sqrt(mse)/sqrt(torch.mean(im2**2))
+    
+#     im1 = im1 * mask
+#     im2 = im2 * mask
+    
+#     mse = torch.mean((im1[mask]-im2[mask])**2)
+#     nrmse = sqrt(mse)/sqrt(torch.mean(im2[mask]**2))
     return 100*nrmse
 
 
@@ -232,22 +251,45 @@ def PSNR(im1, im2, mask):
 
 
 def SSIM(im1, im2, mask):
-    im1 = np.copy(im1); im2 = np.copy(im2); mask = mask.cpu().detach().numpy()
+    im1 = im1.cpu().detach().numpy(); im2 = im2.cpu().detach().numpy(); mask = mask.cpu().detach().numpy()
     im1 = im1 * mask; im2 = im2 * mask;
     mask = mask.astype(bool)
 
-    min_im = np.min([np.min(im1),np.min(im2)])
+    # im1 = np.pad(im1,((5,5),(5,5),(5,5)),'constant',constant_values=(0))   
+    # im2 = np.pad(im2,((5,5),(5,5),(5,5)),'constant',constant_values=(0)) 
+    # mask = np.pad(mask,((5,5),(5,5),(5,5)),'constant',constant_values=(0)).astype(bool) 
+    
+    min_im = np.min([np.min(im1), np.min(im2)])
     im1[mask] = im1[mask] - min_im
     im2[mask] = im2[mask] - min_im
     
-    max_im = np.max([np.max(im1),np.max(im2)])
-    im1 = 255*im1/max_im
-    im2 = 255*im2/max_im
+    max_im = np.max([np.max(im1), np.max(im2)])
+    im1 = 255 * im1 / max_im
+    im2 = 255 * im2 / max_im
+    
+    if len(im1.shape) == 3:
+        ssim_value, ssim_map = ssim(im1, im2, data_range=255, full=True)# gaussian_weights=True, K1=0.01, K2=0.03, full=True)
+    
+        return np.mean(ssim_map[mask]), ssim_map
+    elif len(im1.shape) == 5:
+        im1 = im1.squeeze()
+        im2 = im2.squeeze()
+        mask = mask.squeeze()
+        
+        if len(im1.shape) == 3:
+            im1 = np.expand_dims(im1, axis=0)
+            im2 = np.expand_dims(im2, axis=0)
+            mask = np.expand_dims(mask, axis=0)
+        
+        ssim_maps = np.zeros(im1.shape)
 
-    _, ssim_map =ssim(im1, im2, data_range=255, gaussian_weights=True, K1=0.01, K2=0.03, full=True)
-    return np.mean(ssim_map[mask])
-
-
+        for i in range(0, im1.shape[0]):
+            _, ssim_maps[i, :, :, :] = ssim(im1[i, :, :, :], im2[i, :, :, :], data_range=255, full=True)# gaussian_weights=True, K1=0.01, K2=0.03, full=True)
+        return np.mean(ssim_maps[mask])
+    else:
+        raise Exception('SSIM - input dimension error')    
+        
+        
 def createDirectory(directory):
     try:
         if not os.path.exists(directory):
@@ -345,3 +387,19 @@ def crop_img_16x(img):
 #         self.qsm_std = value_file['qsm_std']
         
 #         self.matrix_size = self.mask.shape
+
+# def SSIM(im1, im2, mask):
+#     im1 = np.copy(im1); im2 = np.copy(im2); mask = mask.cpu().detach().numpy()
+#     im1 = im1 * mask; im2 = im2 * mask;
+#     mask = mask.astype(bool)
+
+#     min_im = np.min([np.min(im1),np.min(im2)])
+#     im1[mask] = im1[mask] - min_im
+#     im2[mask] = im2[mask] - min_im
+    
+#     max_im = np.max([np.max(im1),np.max(im2)])
+#     im1 = 255*im1/max_im
+#     im2 = 255*im2/max_im
+
+#     _, ssim_map =ssim(im1, im2, data_range=255, gaussian_weights=True, K1=0.01, K2=0.03, full=True)
+#     return np.mean(ssim_map[mask])

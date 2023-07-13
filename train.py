@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.05.01
+# Last update: 23.07.13
 '''
 import os
 import logging
@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 import datetime
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 import logging_helper as logging_helper
 from utils import *
@@ -31,6 +32,7 @@ from custom_dataset import *
 from train_params import parse
 
 args = parse()
+writer = SummaryWriter(args.CHECKPOINT_PATH + 'runs/')
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]= args.GPU_NUM
@@ -70,8 +72,8 @@ if torch.cuda.device_count() > 1:
     model = nn.DataParallel(model).to(device)
 
 optimizer = torch.optim.RMSprop(model.parameters(), lr=args.LEARNING_RATE)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.98, last_epoch=-1)
-# scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=args.LR_EXP_DECAY_GAMMA)
+# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.98, last_epoch=-1)
+scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=args.LR_EXP_DECAY_GAMMA)
 
 train_set = train_dataset(args)
 valid_set = valid_dataset(args)
@@ -87,8 +89,9 @@ train_loss = []
 valid_loss = []
 nrmse = []
 psnr = []
-best_loss = math.inf; best_nrmse = math.inf; best_psnr = -math.inf
-best_epoch_loss = 0; best_epoch_nrmse = 0; best_epoch_psnr = 0
+ssim = []
+best_loss = math.inf; best_nrmse = math.inf; best_psnr = -math.inf; best_ssim = -math.inf
+best_epoch_loss = 0; best_epoch_nrmse = 0; best_epoch_psnr = 0; best_epoch_ssim = 0
 data_index = 0; local_f_index = 1; qsm_index = 2; mask_index = 2;
 
 start_time = time.time()
@@ -104,6 +107,7 @@ for epoch in tqdm(range(args.TRAIN_EPOCH)):
     valid_loss_list =[]
     nrmse_list = []
     psnr_list = []
+    ssim_list = []
     
     for train_data in tqdm(train_loader):
         model.train()
@@ -161,8 +165,8 @@ for epoch in tqdm(range(args.TRAIN_EPOCH)):
             m_batch = torch.tensor(valid_set.mask[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float)
 
             ### Normalization ###
-            local_f_batch = ((local_f_batch.cpu() - valid_set.field_mean) / valid_set.field_std).to(device)
-            qsm_batch = ((qsm_batch.cpu() - valid_set.qsm_mean) / valid_set.qsm_std).to(device)
+            local_f_batch = ((local_f_batch - valid_set.field_mean) / valid_set.field_std).to(device)
+            qsm_batch = ((qsm_batch - valid_set.qsm_mean) / valid_set.qsm_std).to(device)
 
             ### Masking ###
             local_f_batch = local_f_batch * m_batch
@@ -176,24 +180,33 @@ for epoch in tqdm(range(args.TRAIN_EPOCH)):
             l1loss = l1_loss(pred, qsm_batch)
             
             ### De-normalization ###
-            pred = ((pred.cpu() * valid_set.qsm_std) + valid_set.qsm_mean).to(device)
-            qsm_batch = ((qsm_batch.cpu() * valid_set.qsm_std) + valid_set.qsm_mean).to(device)
+            pred = ((pred * valid_set.qsm_std) + valid_set.qsm_mean).to(device)
+            qsm_batch = ((qsm_batch * valid_set.qsm_std) + valid_set.qsm_mean).to(device)
             
             _nrmse = NRMSE(pred, qsm_batch, m_batch)
             _psnr = PSNR(pred, qsm_batch, m_batch)
+            _ssim = SSIM(pred, qsm_batch, m_batch)
 
             valid_loss_list.append(l1loss.item())
             nrmse_list.append(_nrmse)
             psnr_list.append(_psnr)
+            ssim_list.append(_ssim)
             
             del(local_f_batch, qsm_batch, m_batch, l1loss); torch.cuda.empty_cache();
-        logger.info("Valid: EPOCH %04d / %04d | LOSS %.6f | NRMSE %.4f | PSNR %.4f\n"
-              %(epoch+1, args.TRAIN_EPOCH, np.mean(valid_loss_list), np.mean(_nrmse), np.mean(_psnr)))
+        logger.info("Valid: EPOCH %04d / %04d | LOSS %.6f | NRMSE %.4f | PSNR %.4f | SSIM %.4f\n"
+              %(epoch+1, args.TRAIN_EPOCH, np.mean(valid_loss_list), np.mean(_nrmse), np.mean(_psnr), np.mean(_ssim)))
         
         train_loss.append(np.mean(train_loss_list))
         valid_loss.append(np.mean(valid_loss_list))
-        nrmse.append(np.mean(_nrmse))
-        psnr.append(np.mean(_psnr))
+        nrmse.append(np.mean(nrmse_list))
+        psnr.append(np.mean(psnr_list))
+        ssim.append(np.mean(ssim_list))
+        
+        writer.add_scalar("Train loss/epoch", np.mean(train_loss_list), epoch+1)      
+        writer.add_scalar("valid loss/epoch", np.mean(valid_loss_list), epoch+1)
+        writer.add_scalar("valid nrmse/epoch", np.mean(_nrmse), epoch+1)
+        writer.add_scalar("valid psnr/epoch", np.mean(_psnr), epoch+1)
+        writer.add_scalar("valid ssim/epoch", np.mean(_ssim), epoch+1)
 
         if np.mean(valid_loss_list) < best_loss:
             save_model(epoch+1, model, args.CHECKPOINT_PATH, 'best_loss')
@@ -207,6 +220,10 @@ for epoch in tqdm(range(args.TRAIN_EPOCH)):
             save_model(epoch+1, model, args.CHECKPOINT_PATH, 'best_psnr')
             best_psnr = np.mean(_psnr)
             best_epoch_psnr = epoch+1
+        if np.mean(_ssim) > best_ssim:
+            save_model(epoch+1, model, args.CHECKPOINT_PATH, 'best_ssim')
+            best_ssim = np.mean(_ssim)
+            best_epoch_ssim = epoch+1
 
     ### Saving the model ###
 #     if (epoch+1) % args.SAVE_STEP == 0:

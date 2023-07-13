@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.05.06
+# Last update: 23.07.13
 '''
 import math
 import h5py
@@ -25,14 +25,14 @@ class train_dataset():
         value_file = scipy.io.loadmat(args.VALUE_PATH + args.VALUE_FILE)
         
         self.field = data_file['pField']
-        self.qsm = data_file['pCosmosSus']
+        self.qsm = data_file['pCosmosSusbC']
         self.mask = data_file['pMask']
         
-        self.field_mean = value_file['field_mean']
-        self.field_std = value_file['field_std']
+        self.field_mean = value_file['field_mean'].item()
+        self.field_std = value_file['field_std'].item()
         
-        self.qsm_mean = value_file['cosmos_sus_mean']
-        self.qsm_std = value_file['cosmos_sus_std']
+        self.qsm_mean = value_file['cosmos_sus_bC_mean'].item()
+        self.qsm_std = value_file['cosmos_sus_bC_std'].item()
         
     def __len__(self):
         return len(self.mask)
@@ -59,7 +59,7 @@ class valid_dataset():
 
         value_file = scipy.io.loadmat(args.VALUE_PATH + args.VALUE_FILE)
             
-        qsm = data_file['cosmos_4d']
+        qsm = data_file['cosmos_bC_4d']
         
         if args.INPUT_UNIT == 'Hz':
             ### Converting Hz maps to ppm ###
@@ -87,11 +87,11 @@ class valid_dataset():
         self.mask = data_file['mask_4d']
         self.qsm = qsm
         
-        self.field_mean = value_file['field_mean']
-        self.field_std = value_file['field_std']
+        self.field_mean = value_file['field_mean'].item()
+        self.field_std = value_file['field_std'].item()
         
-        self.qsm_mean = value_file['cosmos_sus_mean']
-        self.qsm_std = value_file['cosmos_sus_std']
+        self.qsm_mean = value_file['cosmos_sus_bC_mean'].item()
+        self.qsm_std = value_file['cosmos_sus_bC_std'].item()
         
         self.matrix_size = self.mask.shape
 
@@ -106,11 +106,11 @@ class test_dataset():
         self.csf_mask = []
         self.matrix_size = []
         
-        self.field_mean = value_file['field_mean']
-        self.field_std = value_file['field_std']
+        self.field_mean = value_file['field_mean'].item()
+        self.field_std = value_file['field_std'].item()
 
-        self.qsm_mean = value_file['cosmos_sus_mean']
-        self.qsm_std = value_file['cosmos_sus_std']
+        self.qsm_mean = value_file['cosmos_sus_bC_mean'].item()
+        self.qsm_std = value_file['cosmos_sus_bC_std'].item()
             
         for i in range(0, len(args.TEST_FILE)):
             try:
@@ -145,7 +145,7 @@ class test_dataset():
             self.mask.append(crop_img_16x(data_file['mask_4d']))
 
             if args.LABEL_EXIST is True:
-                self.qsm.append(crop_img_16x(data_file['cosmos_4d']))
+                self.qsm.append(crop_img_16x(data_file['cosmos_bC_4d']))
 
             if args.CSF_MASK_EXIST is True:
                 csf_mask_only = crop_img_16x(data_file['csf_mask_4d'])
