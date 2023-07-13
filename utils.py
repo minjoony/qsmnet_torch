@@ -90,7 +90,6 @@ def model_loss(pred_qsm, label_local_f, m, d):
     ### FFT(pred sus map) x dipole kernel ###
     pred_qsm = torch.stack((pred_qsm, torch.zeros(pred_qsm.shape, dtype=pred_qsm.dtype, device=device)), dim=-1)
     fft_p = torch.fft.fft(pred_qsm, 3)
-    # dtype = fft_p.dtype;
     
     d = d[np.newaxis, np.newaxis, ...]
     d = torch.tensor(d, dtype=pred_qsm.dtype, device=device).repeat(num_batch, 1, 1, 1, 1)
