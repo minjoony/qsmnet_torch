@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.07.13
+# Last update: 23.07.15
 '''
 import os
 import logging
@@ -144,11 +144,12 @@ for idx in range(0, len(args.TEST_FILE)):
             # input: local_f_batch (dim: [batch_size, 1, 64, 64, 64])
             # label: qsm_batch (dim: [batch_size, 1, 64, 64, 64])
             start_time = time.time()
+            
             pred_batch = model(local_f_batch)
+            
             inferenc_time = time.time() - start_time
             time_list.append(inferenc_time)
             time_total_list.append(inferenc_time)
-
 
             ### De-normalization (input & output) ###
             pred_qsm = ((pred_batch[:, 0, ...] * test_set.qsm_std) + test_set.qsm_mean).to(device).squeeze() # denormalization
@@ -158,6 +159,7 @@ for idx in range(0, len(args.TEST_FILE)):
                 
                 ### Metric calculation ###
                 l1loss = l1_loss(pred_batch, qsm_batch)
+                
                 if args.CSF_MASK_EXIST == True:
                     csf_mask_batch = torch.tensor(input_csf_mask[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float).squeeze()
 

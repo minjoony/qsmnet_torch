@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.07.13
+# Last update: 23.07.15
 '''
 import math
 import h5py
@@ -148,8 +148,22 @@ class test_dataset():
                 self.qsm.append(crop_img_16x(data_file['cosmos_bC_4d']))
 
             if args.CSF_MASK_EXIST is True:
-                csf_mask_only = crop_img_16x(data_file['csf_mask_4d'])
-                mask_wo_csf = self.mask - csf_mask_only
-                self.csf_mask.append(mask_wo_csf)
+                subj_name = args.TEST_FILE[i].split('_')[0]
+                csf_mask_file = scipy.io.loadmat(args.TEST_PATH + subj_name + '_csf_mask_for_metric.mat')
 
+                csf_mask_only = crop_img_16x(csf_mask_file['CSF_mask_4d'])
+                csf_mask_only = (csf_mask_only == 0)
+                mask_wo_csf = self.mask[i] * csf_mask_only
+                
+                ### Vessel masking-out ###
+                # vessel_mask_file = scipy.io.loadmat(args.TEST_PATH + subj_name + '_csf_mask_for_metric_vessel.mat')
+                # vessel_mask_only = crop_img_16x(vessel_mask_file['vessel_mask_4d'])
+                # vessel_mask_only = (vessel_mask_only == 0)
+                # mask_wo_vessel = mask_wo_csf * vessel_mask_only
+                
+                self.csf_mask.append(mask_wo_csf)
+                # scipy.io.savemat(args.RESULT_PATH + 'csfmask_.mat', mdict={'mask_vessel': vessel_mask_only,
+                                                                           # 'mask_csf': csf_mask_only,
+                                                                           # 'mask_wo_vessel': mask_wo_vessel})
+            
             self.matrix_size.append(crop_img_16x(data_file['mask_4d']).shape)
