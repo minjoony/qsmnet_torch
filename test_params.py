@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.07.15
+# Last update: 23.07.22
 '''
 """
 Experiment setting parameters
@@ -33,20 +33,21 @@ Experiment setting parameters
     RESULT_PATH: path to save the results.
     RESULT_FILE: filename of result file (mat).
 """
-GPU_NUM = '0'
+GPU_NUM = '6'
 INPUT_UNIT = 'ppm'
-TAG = 'nrmse'
+TAG = 'loss'
 LABEL_EXIST = True 
 CSF_MASK_EXIST = True
 
 TEST_PATH = '../Data/Test/'
-TEST_FILE = ['subj05_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj10_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj08_DataFor_xsepnet_ppm_COSMOS_6dir_final', 'subj14_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat']
+# TEST_FILE = ['MSsubj2_calcification_DataFor_xsepnet_ppm.mat']
+TEST_FILE = ['subj05_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj08_DataFor_xsepnet_ppm_COSMOS_6dir_final', 'subj14_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat'] #]#, 'subj06_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat',
 
-CHECKPOINT_PATH = './Checkpoint/230712_qsmnet_stepdecay_subj06/'
-CHECKPOINT_FILE = 'best_nrmse.pth.tar'
+CHECKPOINT_PATH = './Checkpoint/230720_qsmnetplus_expdecay_subj06_GPU1/'
+CHECKPOINT_FILE = 'best_' + TAG + '.pth.tar'
 
 VALUE_FILE_PATH = '../Data/'
-VALUE_FILE_NAME = 'xsepnet_train_patch_norm_factor.mat'
+VALUE_FILE_NAME = 'xsepnet_train_patch_norm_factor_final.mat'
 
 RESULT_PATH = CHECKPOINT_PATH + 'Results/'
 RESULT_FILE = ''
