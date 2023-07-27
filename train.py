@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.07.13
+# Last update: 23.07.27
 '''
 import os
 import logging
@@ -72,8 +72,8 @@ if torch.cuda.device_count() > 1:
     model = nn.DataParallel(model).to(device)
 
 optimizer = torch.optim.RMSprop(model.parameters(), lr=args.LEARNING_RATE)
-# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.98, last_epoch=-1)
-scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=args.LR_EXP_DECAY_GAMMA)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.98, last_epoch=-1)
+# scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=args.LR_EXP_DECAY_GAMMA)
 
 train_set = train_dataset(args)
 valid_set = valid_dataset(args)

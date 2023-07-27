@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.07.15
+# Last update: 23.07.27
 '''
 import os
 import logging
@@ -54,7 +54,7 @@ for key, value in vars(args).items():
 test_set = test_dataset(args)
 
 model = QSMnet(channel_in=args.CHANNEL_IN, kernel_size=args.KERNEL_SIZE).to(device)
-load_file_name = args.CHECKPOINT_PATH + 'best_' + args.TAG + '.pth.tar'
+load_file_name = args.CHECKPOINT_PATH + args.CHECKPOINT_FILE
 checkpoint = torch.load(load_file_name)
 
 multi_gpu_used = 0
@@ -200,10 +200,11 @@ for idx in range(0, len(args.TEST_FILE)):
             total_time = np.mean(time_list)
             logger.info(f'{subj_name} - NRMSE: {NRMSE_mean:.4f}, {NRMSE_std:.4f}  PSNR: {PSNR_mean:.4f}, {PSNR_std:.4f}  SSIM: {SSIM_mean:.4f}, {SSIM_std:.4f}  Loss: {test_loss:.4f}')
 
+            if args.RESULT_SAVE_TOGGLE == True
             scipy.io.savemat(args.RESULT_PATH + args.RESULT_FILE + subj_name + '_' + args.TAG + '.mat',
                              mdict={'input_local': input_field_map,
                                     'label_qsm': label_qsm_map,
-                                    'pred_qsm': pred_qsm_map,
+                                    'pred_qsm': pred_qsm_map})
                                     'NRMSEmean': NRMSE_mean,
                                     'PSNRmean': PSNR_mean,
                                     'SSIMmean': SSIM_mean,

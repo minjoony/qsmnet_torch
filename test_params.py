@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.07.22
+# Last update: 23.07.27
 '''
 """
 Experiment setting parameters
@@ -17,6 +17,7 @@ Experiment setting parameters
     TAG: type of trained network (loss: best loss model, nrmse: best nrmse model, psnr: best psnr model)
     LABEL_EXIST: bool value if ground-truth label exist (True: ground-truth exist, False: ground-truth not exist)
     CSF_MASK_EXIST: bool value if CSF mask exist (True: CSF mask exist, False: CSF mask not exist)
+    RESULT_SAVE_TOGGLE: bool value to decide saving the results (True: save the results, False: do not save the results)
     
     TEST_PATH: path of test dataset.
     TEST_FILE: filename of test dataset.
@@ -33,15 +34,15 @@ Experiment setting parameters
     RESULT_PATH: path to save the results.
     RESULT_FILE: filename of result file (mat).
 """
-GPU_NUM = '6'
+GPU_NUM = '2'
 INPUT_UNIT = 'ppm'
 TAG = 'loss'
 LABEL_EXIST = True 
 CSF_MASK_EXIST = True
+RESULT_SAVE_TOGGLE = False
 
 TEST_PATH = '../Data/Test/'
-# TEST_FILE = ['MSsubj2_calcification_DataFor_xsepnet_ppm.mat']
-TEST_FILE = ['subj05_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj08_DataFor_xsepnet_ppm_COSMOS_6dir_final', 'subj14_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat'] #]#, 'subj06_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat',
+TEST_FILE = ['subj05_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj08_DataFor_xsepnet_ppm_COSMOS_6dir_final', 'subj14_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat']
 
 CHECKPOINT_PATH = './Checkpoint/230720_qsmnetplus_expdecay_subj06_GPU1/'
 CHECKPOINT_FILE = 'best_' + TAG + '.pth.tar'
@@ -86,7 +87,8 @@ def parse():
     parser.add_argument("--TAG", default=TAG)
     parser.add_argument("--LABEL_EXIST", default=LABEL_EXIST)
     parser.add_argument("--CSF_MASK_EXIST", default=CSF_MASK_EXIST)
-
+    parser.add_argument("--RESULT_SAVE_TOGGLE", default=RESULT_SAVE_TOGGLE)
+    
     parser.add_argument("--TEST_PATH", default=TEST_PATH)
     parser.add_argument("--TEST_FILE", default=TEST_FILE)
     

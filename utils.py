@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.07.13
+# Last update: 23.07.27
 '''
 import os
 import math
@@ -311,94 +311,3 @@ def crop_img_16x(img):
         img = img[:, int(residual/2):int(-(residual/2)), :]
         
     return img
-
-
-# class train_dataset():
-#     def __init__(self, args):
-#         data_file = h5py.File(path + 'xsepnet_train_patch.hdf5', "r")
-#         value_file = scipy.io.loadmat(path + 'xsepnet_train_patch_norm_factor.mat')
-        
-#         self.field = data_file['pField']
-#         self.qsm = data_file['pCosmosSus']
-#         self.mask = data_file['pMask']
-        
-#         self.field_mean = value_file['field_mean']
-#         self.field_std = value_file['field_std']
-        
-#         self.qsm_mean = value_file['cosmos_sus_mean']
-#         self.qsm_std = value_file['cosmos_sus_std']
-        
-#     def __len__(self):
-#         return len(self.mask)
-
-#     def __getitem__(self, idx):
-#         # dim: [1, 64, 64, 64]
-#         local_f_batch = torch.tensor(self.field[idx,...], dtype=torch.float).unsqueeze(0)
-#         qsm_batch = torch.tensor(self.qsm[idx,...], dtype=torch.float).unsqueeze(0)
-#         m_batch = torch.tensor(self.mask[idx,...], dtype=torch.float).unsqueeze(0)
-
-#         ### Normalization ###
-#         local_f_batch = ((local_f_batch - self.field_mean) / self.field_std)
-#         qsm_batch = ((qsm_batch - self.qsm_mean) / self.qsm_std)
-
-#         return idx, local_f_batch, qsm_batch, m_batch
-
-
-# class valid_dataset():
-#     def __init__(self, args):
-#         data_file = scipy.io.loadmat(args.VALID_PATH + 'subj10_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat')
-#         value_file = scipy.io.loadmat(args.VALUE_PATH + 'xsepnet_train_patch_norm_factor.mat')
-
-#         qsm = data_file['cosmos_4d']
-        
-#         if args.INPUT_UNIT == 'Hz':
-#             ### Converting Hz maps to ppm ###
-#             print('Input map unit has been changed (hz -> ppm)')
-#             field = data_file['local_f_hz_4d']
-
-#             gyro = args.gyro
-#             delta_TE = args.delta_TE
-#             CF = args.CF
-#             Dr = args.Dr
-
-#             field_in_ppm = -1 * field / (2*math.pi*delta_TE) / CF * 1e6
-#         elif args.INPUT_UNIT == 'radian':
-#             print('Input map unit has been changed (radian -> ppm)')
-#             field = data_file['local_f_4d']
-            
-#             delta_TE = args.delta_TE
-#             CF = args.CF
-            
-#             field_in_ppm = -1 * field / (2*math.pi*delta_TE) / CF * 1e6
-#         elif args.INPUT_UNIT == 'ppm':
-#             field = data_file['local_f_ppm_4d']
-
-#             field_in_ppm = field
-        
-#         self.field = field_in_ppm
-#         self.mask = data_file['mask_4d']
-#         self.qsm = qsm
-        
-#         self.field_mean = value_file['field_mean']
-#         self.field_std = value_file['field_std']
-        
-#         self.qsm_mean = value_file['qsm_mean']
-#         self.qsm_std = value_file['qsm_std']
-        
-#         self.matrix_size = self.mask.shape
-
-# def SSIM(im1, im2, mask):
-#     im1 = np.copy(im1); im2 = np.copy(im2); mask = mask.cpu().detach().numpy()
-#     im1 = im1 * mask; im2 = im2 * mask;
-#     mask = mask.astype(bool)
-
-#     min_im = np.min([np.min(im1),np.min(im2)])
-#     im1[mask] = im1[mask] - min_im
-#     im2[mask] = im2[mask] - min_im
-    
-#     max_im = np.max([np.max(im1),np.max(im2)])
-#     im1 = 255*im1/max_im
-#     im2 = 255*im2/max_im
-
-#     _, ssim_map =ssim(im1, im2, data_range=255, gaussian_weights=True, K1=0.01, K2=0.03, full=True)
-#     return np.mean(ssim_map[mask])

@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.05.01
+# Last update: 23.07.27
 '''
 """
 Experiment setting parameters
@@ -27,17 +27,17 @@ Experiment setting parameters
     PRE_NET_CHECKPOINT_PATH: path of pre-network(QSMnet) checkpoint.
     PRE_NET_CHECKPOINT_FILE: filename of pre-network(QSMnet) checkpoint.
 """
-GPU_NUM = '0, 1'
+GPU_NUM = '5'
 SEED = 777
 INPUT_UNIT = 'ppm'
 
-TRAIN_PATH = '../Data/Train/'
+TRAIN_PATH = '/fast_storage/minjoon/x-sep/Train/'
 VALID_PATH = '../Data/Valid/'
 VALUE_PATH = '../Data/'
-TRAIN_FILE = 'xsepnet_train_patch_augmented.hdf5'
-VALID_FILE = 'subj10_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat'
-VALUE_FILE = 'xsepnet_train_patch_norm_factor_augmented.mat'
-CHECKPOINT_PATH = './Checkpoint/230502_qsmnetplus_cosmos_stepLR_0003/'
+TRAIN_FILE = 'xsepnet_train_patch_augmented_final.hdf5'
+VALID_FILE = 'subj06_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat'
+VALUE_FILE = 'xsepnet_train_patch_norm_factor_augmented_final.mat'
+CHECKPOINT_PATH = './Checkpoint/230720_qsmnetplus_stepdecay_subj06/'
 
 
 """
@@ -74,9 +74,9 @@ Hyper-parameters
     W_GDLOSS: weight of gradient loss [QSMnet: 0.1, QSMnet+: 0.1]
 """
 TRAIN_EPOCH = 25
-SAVE_STEP = 10
-LEARNING_RATE = 0.003
-LR_EXP_DECAY_GAMMA = 'stepLR'
+SAVE_STEP = 5
+LEARNING_RATE = 0.001
+LR_EXP_DECAY_GAMMA = 0.9999
 BATCH_SIZE = 12
 W_L1Loss = 1
 W_MDLOSS = 0.5
