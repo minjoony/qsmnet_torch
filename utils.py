@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.07.27
+# Last update: 23.08.05
 '''
 import os
 import math
@@ -81,15 +81,14 @@ def model_loss(pred_qsm, label_local_f, m, d):
         m (torch.tensor): (batch_size, 1, s1, s2, s3) size matrix. mask.
         d (ndarray): (s1, s2, s3) size matrix. dipole kernel.
     Description:
-        [ local field map = sus map * dipole kernel ] in image domain
-        using FFT, we can use multiplication instead of convolution.
+        local field loss: [ local field map = sus map * dipole kernel ] using FFT, we can use multiplication instead of convolution in image domain.
     """
     num_batch = pred_qsm.shape[0]
     device = pred_qsm.device;
     
     ### FFT(pred sus map) x dipole kernel ###
     pred_qsm = torch.stack((pred_qsm, torch.zeros(pred_qsm.shape, dtype=pred_qsm.dtype, device=device)), dim=-1)
-    fft_p = torch.fft.fft(pred_qsm, 3)
+    fft_p = torch.fft(pred_qsm, 3)
     
     d = d[np.newaxis, np.newaxis, ...]
     d = torch.tensor(d, dtype=pred_qsm.dtype, device=device).repeat(num_batch, 1, 1, 1, 1)
@@ -100,7 +99,7 @@ def model_loss(pred_qsm, label_local_f, m, d):
     y[..., 1] = fft_p[..., 0] * d[..., 1] + fft_p[..., 1] * d[..., 0] # imaginary part
     
     ### IFT results = pred susceptibility map * dipole kernel ###
-    y = torch.fft.ifft(y, 3)
+    y = torch.ifft(y, 3)
     pred_local_f = y[..., 0]
     
     ############################################################################################################
@@ -115,6 +114,7 @@ def model_loss(pred_qsm, label_local_f, m, d):
     local_f_loss = l1_loss(label_local_f*m, pred_local_f*m)
     
     return local_f_loss
+    
 
 
 def grad_loss(x, y):
