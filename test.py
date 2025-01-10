@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.07.27
+# Last update: 24.11.01
 '''
 import os
 import logging
@@ -59,7 +59,7 @@ checkpoint = torch.load(load_file_name)
 
 multi_gpu_used = 0
 new_state_dict = OrderedDict()
-for name in checkpoint['state_dict']:    
+for name in checkpoint['state_dict']:  
     if name[:6] != 'module':
         break
     else:
@@ -103,6 +103,8 @@ for idx in range(0, len(args.TEST_FILE)):
 
         input_field = test_set.field[idx]
         input_mask = test_set.mask[idx]
+        input_mask_for_eval_pos = test_set.mask_for_eval_pos[idx]
+        input_mask_for_eval_neg = test_set.mask_for_eval_neg[idx]
         if args.LABEL_EXIST == True:
             label_qsm = test_set.qsm[idx]
         if args.CSF_MASK_EXIST == True:
@@ -117,6 +119,8 @@ for idx in range(0, len(args.TEST_FILE)):
             
             input_field = np.expand_dims(input_field, 3)
             input_mask = np.expand_dims(input_mask, 3)
+            input_mask_for_eval_pos = np.expand_dims(input_mask_for_eval_pos, 3)
+            input_mask_for_eval_neg = np.expand_dims(input_mask_for_eval_neg, 3)
             if args.LABEL_EXIST == True:
                 label_qsm = np.expand_dims(label_qsm, 3)
             if args.CSF_MASK_EXIST == True:
@@ -132,7 +136,9 @@ for idx in range(0, len(args.TEST_FILE)):
             local_f_batch = ((local_f_batch - test_set.field_mean) / test_set.field_std).to(device) # normalization
 
             m_batch = torch.tensor(input_mask[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float).squeeze()
-            
+            mask_for_eval_pos_batch = torch.tensor(input_mask_for_eval_pos[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float).squeeze()
+            mask_for_eval_neg_batch = torch.tensor(input_mask_for_eval_neg[np.newaxis, np.newaxis, ..., direction], device=device, dtype=torch.float).squeeze()
+
             local_f_batch = local_f_batch * m_batch # masking
             
             if args.LABEL_EXIST == True:
@@ -200,18 +206,18 @@ for idx in range(0, len(args.TEST_FILE)):
             total_time = np.mean(time_list)
             logger.info(f'{subj_name} - NRMSE: {NRMSE_mean:.4f}, {NRMSE_std:.4f}  PSNR: {PSNR_mean:.4f}, {PSNR_std:.4f}  SSIM: {SSIM_mean:.4f}, {SSIM_std:.4f}  Loss: {test_loss:.4f}')
 
-            if args.RESULT_SAVE_TOGGLE == True
-            scipy.io.savemat(args.RESULT_PATH + args.RESULT_FILE + subj_name + '_' + args.TAG + '.mat',
-                             mdict={'input_local': input_field_map,
-                                    'label_qsm': label_qsm_map,
-                                    'pred_qsm': pred_qsm_map})
-                                    'NRMSEmean': NRMSE_mean,
-                                    'PSNRmean': PSNR_mean,
-                                    'SSIMmean': SSIM_mean,
-                                    'NRMSEstd': NRMSE_std,
-                                    'PSNRstd': PSNR_std,
-                                    'SSIMstd': SSIM_std,
-                                    'inference_time': total_time})
+            if args.RESULT_SAVE_TOGGLE == True:
+                scipy.io.savemat(args.RESULT_PATH + args.RESULT_FILE + subj_name + '_' + args.TAG + '.mat',
+                                 mdict={'input_local': input_field_map,
+                                        'label_qsm': label_qsm_map[:,:,:,0],
+                                        'pred_qsm': pred_qsm_map[:,:,:,0],
+                                        'NRMSEmean': NRMSE_mean,
+                                        'PSNRmean': PSNR_mean,
+                                        'SSIMmean': SSIM_mean,
+                                        'NRMSEstd': NRMSE_std,
+                                        'PSNRstd': PSNR_std,
+                                        'SSIMstd': SSIM_std,
+                                        'inference_time': total_time})
         else:
             total_time = np.mean(time_list)
             scipy.io.savemat(args.RESULT_PATH + args.RESULT_FILE + subj_name + '_' + args.TAG + '.mat',

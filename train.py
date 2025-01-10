@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.07.27
+# Last update: 24.11.01
 '''
 import os
 import logging
@@ -72,8 +72,7 @@ if torch.cuda.device_count() > 1:
     model = nn.DataParallel(model).to(device)
 
 optimizer = torch.optim.RMSprop(model.parameters(), lr=args.LEARNING_RATE)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.98, last_epoch=-1)
-# scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=args.LR_EXP_DECAY_GAMMA)
+scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=args.LR_EXP_DECAY_GAMMA)
 
 train_set = train_dataset(args)
 valid_set = valid_dataset(args)
@@ -123,19 +122,6 @@ for epoch in tqdm(range(args.TRAIN_EPOCH)):
         local_f_batch = local_f_batch * m_batch
         
         pred = model(local_f_batch)
-        
-        ##
-#         pred = pred * m_batch
-#         label = qsm_batch * m_batch
-        
-#         pred = (pred.cpu().detach().numpy() * train_set.qsm_std) + train_set.qsm_mean
-        
-#         label = (label.cpu().detach().numpy() * train_set.qsm_std) + train_set.qsm_mean
-        
-#         scipy.io.savemat(args.CHECKPOINT_PATH + 'Results/predMaps_train.mat',
-#                  mdict={'label_qsm': label,
-#                         'pred_qsm': pred})
-        ##
         
         loss, l1loss, mdloss, gdloss = total_loss(pred, qsm_batch, local_f_batch, m_batch, dipole, args.W_L1LOSS, args.W_MDLOSS, args.W_GDLOSS,
                                                   train_set.qsm_mean, train_set.qsm_std, train_set.field_mean, train_set.field_std)
@@ -209,7 +195,8 @@ for epoch in tqdm(range(args.TRAIN_EPOCH)):
         writer.add_scalar("valid ssim/epoch", np.mean(_ssim), epoch+1)
 
         if np.mean(valid_loss_list) < best_loss:
-            save_model(epoch+1, model, args.CHECKPOINT_PATH, 'best_loss')
+            tag = 'best_loss_' + str(epoch+1)
+            save_model(epoch+1, model, args.CHECKPOINT_PATH, tag)
             best_loss = np.mean(valid_loss_list)
             best_epoch_loss = epoch+1
         if np.mean(_nrmse) < best_nrmse:
@@ -226,8 +213,8 @@ for epoch in tqdm(range(args.TRAIN_EPOCH)):
             best_epoch_ssim = epoch+1
 
     ### Saving the model ###
-#     if (epoch+1) % args.SAVE_STEP == 0:
-#         save_model(epoch+1, model, args.CHECKPOINT_PATH, epoch+1)
+    if (epoch+1) % args.SAVE_STEP == 0:
+        save_model(epoch+1, model, args.CHECKPOINT_PATH, epoch+1)
 
 logger.info("------ Training is finished ------")
 logger.info(f'[best epochs]\nLoss: {best_epoch_loss}\nNRMSE: {best_epoch_nrmse}\nPSNR: {best_epoch_psnr}')

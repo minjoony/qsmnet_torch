@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.07.27
+# Last update: 24.11.01
 '''
 import math
 import h5py
@@ -25,14 +25,14 @@ class train_dataset():
         value_file = scipy.io.loadmat(args.VALUE_PATH + args.VALUE_FILE)
         
         self.field = data_file['pField']
-        self.qsm = data_file['pCosmosSusbC']
+        self.qsm = data_file['pCosmosSus']
         self.mask = data_file['pMask']
         
         self.field_mean = value_file['field_mean'].item()
         self.field_std = value_file['field_std'].item()
         
-        self.qsm_mean = value_file['cosmos_sus_bC_mean'].item()
-        self.qsm_std = value_file['cosmos_sus_bC_std'].item()
+        self.qsm_mean = value_file['cosmos_sus_mean'].item()
+        self.qsm_std = value_file['cosmos_sus_std'].item()
         
     def __len__(self):
         return len(self.mask)
@@ -59,7 +59,7 @@ class valid_dataset():
 
         value_file = scipy.io.loadmat(args.VALUE_PATH + args.VALUE_FILE)
             
-        qsm = data_file['cosmos_bC_4d']
+        qsm = data_file['cosmos_4d']
         
         if args.INPUT_UNIT == 'Hz':
             ### Converting Hz maps to ppm ###
@@ -90,8 +90,8 @@ class valid_dataset():
         self.field_mean = value_file['field_mean'].item()
         self.field_std = value_file['field_std'].item()
         
-        self.qsm_mean = value_file['cosmos_sus_bC_mean'].item()
-        self.qsm_std = value_file['cosmos_sus_bC_std'].item()
+        self.qsm_mean = value_file['cosmos_sus_mean'].item()
+        self.qsm_std = value_file['cosmos_sus_std'].item()
         
         self.matrix_size = self.mask.shape
 
@@ -105,12 +105,14 @@ class test_dataset():
         self.qsm = []
         self.csf_mask = []
         self.matrix_size = []
+        self.mask_for_eval_pos = []
+        self.mask_for_eval_neg = []
         
         self.field_mean = value_file['field_mean'].item()
         self.field_std = value_file['field_std'].item()
 
-        self.qsm_mean = value_file['cosmos_sus_bC_mean'].item()
-        self.qsm_std = value_file['cosmos_sus_bC_std'].item()
+        self.qsm_mean = value_file['cosmos_sus_mean'].item()
+        self.qsm_std = value_file['cosmos_sus_std'].item()
             
         for i in range(0, len(args.TEST_FILE)):
             try:
@@ -135,7 +137,7 @@ class test_dataset():
                 delta_TE = args.delta_TE
                 CF = args.CF
 
-                field_in_ppm = -1 * field / (2*math.pi*delta_TE) / CF * 1e6
+                field_in_ppm = field / (2*math.pi*delta_TE) / CF * 1e6
             elif args.INPUT_UNIT == 'ppm':
                 field = data_file['local_f_ppm_4d']
 
@@ -143,27 +145,42 @@ class test_dataset():
 
             self.field.append(crop_img_16x(field_in_ppm))
             self.mask.append(crop_img_16x(data_file['mask_4d']))
-
+            self.mask_for_eval_pos.append(crop_img_16x(data_file['mask_4d']))
+            self.mask_for_eval_neg.append(crop_img_16x(data_file['mask_4d']))
+            
             if args.LABEL_EXIST is True:
-                self.qsm.append(crop_img_16x(data_file['cosmos_bC_4d']))
+                self.qsm.append(crop_img_16x(data_file['cosmos_4d']))
 
             if args.CSF_MASK_EXIST is True:
                 subj_name = args.TEST_FILE[i].split('_')[0]
-                csf_mask_file = scipy.io.loadmat(args.TEST_PATH + subj_name + '_csf_mask_for_metric.mat')
-
-                csf_mask_only = crop_img_16x(csf_mask_file['CSF_mask_4d'])
-                csf_mask_only = (csf_mask_only == 0)
-                mask_wo_csf = self.mask[i] * csf_mask_only
+                # csf_mask_file = scipy.io.loadmat(args.TEST_PATH + subj_name + '_csf_mask_for_metric.mat')
                 
                 ### Vessel masking-out ###
-                # vessel_mask_file = scipy.io.loadmat(args.TEST_PATH + subj_name + '_csf_mask_for_metric_vessel.mat')
-                # vessel_mask_only = crop_img_16x(vessel_mask_file['vessel_mask_4d'])
-                # vessel_mask_only = (vessel_mask_only == 0)
-                # mask_wo_vessel = mask_wo_csf * vessel_mask_only
+                try:
+                    vessel_mask_file = scipy.io.loadmat(args.TEST_PATH + subj_name + '_csf_mask_for_metric_vessel_verFinal.mat')
+                    # vessel_mask_file = scipy.io.loadmat(args.TEST_PATH + subj_name + '_csf_mask_for_metric_vessel_verFinal.mat')
+                except:
+                    vessel_mask_file = mat73.loadmat(args.TEST_PATH + subj_name + '_csf_mask_for_metric_vessel_verFinal.mat')
                 
+                csf_mask_only = crop_img_16x(vessel_mask_file['CSF_mask_4d'])
+                csf_mask_only = (csf_mask_only == 0)
+                mask_wo_csf = self.mask[i] * csf_mask_only
+
                 self.csf_mask.append(mask_wo_csf)
-                # scipy.io.savemat(args.RESULT_PATH + 'csfmask_.mat', mdict={'mask_vessel': vessel_mask_only,
-                                                                           # 'mask_csf': csf_mask_only,
-                                                                           # 'mask_wo_vessel': mask_wo_vessel})
+
+                # self.mask_for_eval_pos[i] = mask_wo_csf
+                # self.mask_for_eval_neg[i] = mask_wo_csf
+                
+                pos_vessel_mask_only = crop_img_16x(vessel_mask_file['x_pos_vessel_mask_4d'])
+                neg_vessel_mask_only = crop_img_16x(vessel_mask_file['x_neg_vessel_mask_4d'])
+                
+                pos_vessel_mask_only = (pos_vessel_mask_only == 0)
+                neg_vessel_mask_only = (neg_vessel_mask_only == 0)
+                
+                pos_mask_wo_vessel = mask_wo_csf * pos_vessel_mask_only
+                neg_mask_wo_vessel = mask_wo_csf * neg_vessel_mask_only
+                
+                self.mask_for_eval_pos[i] = pos_mask_wo_vessel
+                self.mask_for_eval_neg[i] = neg_mask_wo_vessel
             
             self.matrix_size.append(crop_img_16x(data_file['mask_4d']).shape)

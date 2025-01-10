@@ -1,4 +1,4 @@
-name: qsmnet
+name: xsepnet
 channels:
   - pytorch
   - conda-forge

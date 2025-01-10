@@ -8,7 +8,7 @@
 #  Seoul National University
 #  email : minjoony@snu.ac.kr
 #
-# Last update: 23.08.05
+# Last update: 24.11.01
 '''
 import os
 import math
@@ -23,6 +23,7 @@ import torch.nn.functional as F
 from math import log10, sqrt
 from numpy.fft import fftn, ifftn, fftshift
 from skimage.metrics import structural_similarity as ssim        
+
         
 def Concat(x, y):
     return torch.cat((x,y),1)
@@ -102,15 +103,6 @@ def model_loss(pred_qsm, label_local_f, m, d):
     y = torch.ifft(y, 3)
     pred_local_f = y[..., 0]
     
-    ############################################################################################################
-#     pred_local_f_temp = pred_local_f.cpu().detach().numpy() * m.cpu().detach().numpy()
-#     label_local_f_temp = label_local_f.cpu().detach().numpy() * m.cpu().detach().numpy()
-        
-#     scipy.io.savemat('./predMaps_train_field.mat',
-#              mdict={'pred_local': pred_local_f_temp,
-#                     'label_local': label_local_f_temp})
-    ############################################################################################################
-    
     local_f_loss = l1_loss(label_local_f*m, pred_local_f*m)
     
     return local_f_loss
@@ -179,14 +171,53 @@ def total_loss(p, y, x, m, d, w_l1, w_md, w_gd, qsm_mean, qsm_std, local_f_mean,
     
     ### De-normalization ###
     device = p.device
-    pred_qsm = torch.from_numpy((pred_qsm.cpu().detach().numpy() * qsm_std) + qsm_mean).to(device)
-    local_f = torch.from_numpy((local_f.cpu().detach().numpy() * local_f_std) + local_f_mean).to(device)
+    pred_qsm = (pred_qsm * qsm_std) + qsm_mean
+    local_f = (local_f * local_f_std) + local_f_mean
 
     ### Model loss ###
     mdloss = model_loss(pred_qsm, local_f, m, d)
         
     total_loss = l1loss * w_l1 + mdloss * w_md + gdloss * w_gd
+    
     return total_loss, l1loss, mdloss, gdloss
+
+def total_loss_nomodelloss(p, y, x, m, d, w_l1, w_md, w_gd, qsm_mean, qsm_std, local_f_mean, local_f_std):
+    """
+    Args:
+        p (torch.tensor): (batch_size, 2, s1, s2, s3) size matrix. predicted susceptability map.
+        y (torch.tensor): (batch_size, 2, s1, s2, s3) size matrix. susceptability map (label).
+        x (torch.tensor): (batch_size, 1, s1, s2, s3) size matrix. local field map.
+        m (torch.tensor): (batch_size, 1, s1, s2, s3) size matrix. mask.
+        d (ndarray): (s1, s2, s3) size matrix. dipole kernel.
+        w_l1 (float): weighting factor for L1 losses
+        w_md (float): weighting factor for model losses
+        w_gd (float): weighting factor for gradient losses
+
+    Returns:
+        l1loss (torch.float): L1 loss. 
+        mdloss (torch.float): model loss
+        gdloss (torch.float): gradient loss
+        tloss (torch.float): total loss. sum of above three losses with weighting factor
+    """
+    ### Splitting into positive/negative maps & masking ###
+    pred_qsm = p * m
+    label_qsm = y * m
+    local_f = x * m
+    
+    ### L1 loss ###
+    l1loss = l1_loss(pred_qsm, label_qsm)
+    
+    ### Gradient loss ###
+    gdloss = grad_loss(pred_qsm, label_qsm)
+    
+    ### De-normalization ###
+    device = p.device
+    pred_qsm = (pred_qsm * qsm_std) + qsm_mean
+    local_f = (local_f * local_f_std) + local_f_mean
+
+    total_loss = l1loss * w_l1 + gdloss * w_gd
+    
+    return total_loss, l1loss, gdloss
 
 
 def dipole_kernel(matrix_size, voxel_size, B0_dir):
@@ -226,8 +257,8 @@ def NRMSE(im1, im2, mask):
     im1 = im1 * mask
     im2 = im2 * mask
     
-    mse = torch.mean((im1-im2)**2)
-    nrmse = sqrt(mse)/sqrt(torch.mean(im2**2))
+    mse = torch.mean((im1[mask>0]-im2[mask>0])**2)
+    nrmse = sqrt(mse)/sqrt(torch.mean(im2[mask>0]**2))
     
 #     im1 = im1 * mask
 #     im2 = im2 * mask
@@ -241,11 +272,11 @@ def PSNR(im1, im2, mask):
     im1 = im1 * mask
     im2 = im2 * mask
     
-    mse = torch.mean((im1-im2)**2)
+    mse = torch.mean((im1[mask>0]-im2[mask>0])**2)
     if mse == 0:
         return 100
-    #PIXEL_MAX = max(im2[mask])
-    PIXEL_MAX = 1
+    PIXEL_MAX = max(im2[mask>0])
+    # PIXEL_MAX = 1
     return 20 * log10(PIXEL_MAX / sqrt(mse))
 
 
@@ -309,5 +340,9 @@ def crop_img_16x(img):
     if img.shape[1] % 16 != 0:
         residual = img.shape[1] % 16
         img = img[:, int(residual/2):int(-(residual/2)), :]
+        
+    if img.shape[2] % 16 != 0:
+        residual = img.shape[2] % 16
+        img = img[:, :, int(residual/2):int(-(residual/2))]
         
     return img

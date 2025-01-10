@@ -1,3 +1,15 @@
+'''
+#
+# Description:
+#  Qsmnet architecture codes
+#
+#  Copyright @ 
+#  Laboratory for Imaging Science and Technology
+#  Seoul National University
+#  email : minjoony@snu.ac.kr
+#
+# Last update: 24.11.01
+'''
 import os
 import numpy as np
 import torch

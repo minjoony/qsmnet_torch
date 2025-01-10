@@ -34,21 +34,21 @@ Experiment setting parameters
     RESULT_PATH: path to save the results.
     RESULT_FILE: filename of result file (mat).
 """
-GPU_NUM = '2'
+GPU_NUM = '1'
 INPUT_UNIT = 'ppm'
 TAG = 'loss'
-LABEL_EXIST = True 
+LABEL_EXIST = True
 CSF_MASK_EXIST = True
 RESULT_SAVE_TOGGLE = False
 
 TEST_PATH = '../Data/Test/'
-TEST_FILE = ['subj05_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat', 'subj08_DataFor_xsepnet_ppm_COSMOS_6dir_final', 'subj14_DataFor_xsepnet_ppm_COSMOS_6dir_final.mat']
+TEST_FILE = ['subj05_DataFor_xsepnet_ppm_COSMOS_6dir_romeo_arlo.mat', 'subj08_DataFor_xsepnet_ppm_COSMOS_6dir_romeo_arlo', 'subj14_DataFor_xsepnet_ppm_COSMOS_6dir_romeo_arlo.mat','subj15_DataFor_xsepnet_ppm_COSMOS_6dir_romeo_arlo.mat', 'subj16_DataFor_xsepnet_ppm_COSMOS_6dir_romeo_arlo.mat', 'subj17_DataFor_xsepnet_ppm_COSMOS_6dir_romeo_arlo.mat']
 
-CHECKPOINT_PATH = './Checkpoint/230720_qsmnetplus_expdecay_subj06_GPU1/'
+CHECKPOINT_PATH = './Checkpoint/241114_qsmnet_expdecay_subj06_romeo_arlo_6subj_mix/'
 CHECKPOINT_FILE = 'best_' + TAG + '.pth.tar'
 
 VALUE_FILE_PATH = '../Data/'
-VALUE_FILE_NAME = 'xsepnet_train_patch_norm_factor_final.mat'
+VALUE_FILE_NAME = 'xsepnet_train_patch_norm_factor_inplane_largedegree_romeo_arlo_6subj_mix.mat'
 
 RESULT_PATH = CHECKPOINT_PATH + 'Results/'
 RESULT_FILE = ''
